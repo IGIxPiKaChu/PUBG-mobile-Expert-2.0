@@ -31,20 +31,41 @@ const App: React.FC = () => {
   
   useEffect(() => {
     try {
-        const savedMessages = localStorage.getItem('chatHistory');
-        if (savedMessages && savedMessages !== '[]') {
-            setMessages(JSON.parse(savedMessages));
+      const savedMessages = localStorage.getItem('chatHistory');
+      if (savedMessages) {
+        const parsedMessages = JSON.parse(savedMessages);
+        if (Array.isArray(parsedMessages)) {
+          // Deep validation to ensure all messages in the array are valid objects
+          const validMessages = parsedMessages.filter(msg => 
+            msg && typeof msg === 'object' && 'id' in msg && 'sender' in msg && 'text' in msg
+          );
+          if (validMessages.length > 0) {
+            setMessages(validMessages);
             setHasStartedChat(true);
+          } else {
+            // The array was empty or contained invalid items.
+            localStorage.removeItem('chatHistory');
+          }
+        } else {
+          // Data was valid JSON but not an array.
+          console.warn("Chat history in localStorage is not an array. Clearing.");
+          localStorage.removeItem('chatHistory');
         }
+      }
     } catch (error) {
-        console.error("Failed to load chat history:", error);
-        localStorage.removeItem('chatHistory');
+      // JSON.parse failed or another error occurred.
+      console.error("Failed to load or parse chat history:", error);
+      localStorage.removeItem('chatHistory');
     }
   }, []);
 
   useEffect(() => {
-    if(messages.length > 0) {
+    // This effect synchronizes the chat history with localStorage.
+    if (messages.length > 0) {
         localStorage.setItem('chatHistory', JSON.stringify(messages));
+    } else {
+        // If messages are cleared (e.g., new chat), ensure localStorage is also cleared.
+        localStorage.removeItem('chatHistory');
     }
   }, [messages]);
 
@@ -97,8 +118,7 @@ const App: React.FC = () => {
 
   const handleNewChat = () => {
     startNewChat();
-    setMessages([]);
-    localStorage.removeItem('chatHistory');
+    setMessages([]); // This will trigger the useEffect to clear localStorage
     setHasStartedChat(false);
     setIsSidebarOpen(false);
   };
