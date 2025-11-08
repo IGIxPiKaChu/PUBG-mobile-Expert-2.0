@@ -1,0 +1,5 @@
+{
+  "name": "PUBG Expert AI",
+  "description": "An AI-powered web application that provides expert advice and strategies for PUBG. Features a password-protected admin panel to upload JSON data, which the AI uses as a knowledge base to enhance its responses.",
+  "requestFramePermissions": []
+}
