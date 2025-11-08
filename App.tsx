@@ -24,6 +24,7 @@ const App: React.FC = () => {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [hasStartedChat, setHasStartedChat] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -31,41 +32,20 @@ const App: React.FC = () => {
   
   useEffect(() => {
     try {
-      const savedMessages = localStorage.getItem('chatHistory');
-      if (savedMessages) {
-        const parsedMessages = JSON.parse(savedMessages);
-        if (Array.isArray(parsedMessages)) {
-          // Deep validation to ensure all messages in the array are valid objects
-          const validMessages = parsedMessages.filter(msg => 
-            msg && typeof msg === 'object' && 'id' in msg && 'sender' in msg && 'text' in msg
-          );
-          if (validMessages.length > 0) {
-            setMessages(validMessages);
+        const savedMessages = localStorage.getItem('chatHistory');
+        if (savedMessages && savedMessages !== '[]') {
+            setMessages(JSON.parse(savedMessages));
             setHasStartedChat(true);
-          } else {
-            // The array was empty or contained invalid items.
-            localStorage.removeItem('chatHistory');
-          }
-        } else {
-          // Data was valid JSON but not an array.
-          console.warn("Chat history in localStorage is not an array. Clearing.");
-          localStorage.removeItem('chatHistory');
         }
-      }
     } catch (error) {
-      // JSON.parse failed or another error occurred.
-      console.error("Failed to load or parse chat history:", error);
-      localStorage.removeItem('chatHistory');
+        console.error("Failed to load chat history:", error);
+        localStorage.removeItem('chatHistory');
     }
   }, []);
 
   useEffect(() => {
-    // This effect synchronizes the chat history with localStorage.
-    if (messages.length > 0) {
+    if(messages.length > 0) {
         localStorage.setItem('chatHistory', JSON.stringify(messages));
-    } else {
-        // If messages are cleared (e.g., new chat), ensure localStorage is also cleared.
-        localStorage.removeItem('chatHistory');
     }
   }, [messages]);
 
@@ -114,11 +94,15 @@ const App: React.FC = () => {
     e.preventDefault();
     handleSend(input);
     setInput('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
   }
 
   const handleNewChat = () => {
     startNewChat();
-    setMessages([]); // This will trigger the useEffect to clear localStorage
+    setMessages([]);
+    localStorage.removeItem('chatHistory');
     setHasStartedChat(false);
     setIsSidebarOpen(false);
   };
@@ -196,6 +180,7 @@ const App: React.FC = () => {
           </h1>
           <button onClick={() => setIsAdminModalOpen(true)} className="p-2 rounded-md hover:bg-gray-700"><AdminIcon /></button>
         </header>
+        <AdminModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} onFileUpload={handleFileUpload} isUnlocked={isUnlocked} setIsUnlocked={setIsUnlocked} />
 
         {!hasStartedChat ? <LandingScreen /> : (
             <>
@@ -205,8 +190,8 @@ const App: React.FC = () => {
                   <MessageIcon sender={msg.sender} />
                   <div className={`px-5 py-3 rounded-xl shadow-lg w-full ${
                       msg.sender === MessageSender.AI ? 'bg-gray-800/80 border border-gray-700'
-                      : msg.sender === MessageSender.USER ? 'bg-cyan-900/70 border border-cyan-700'
-                      : 'bg-yellow-900/50 border border-yellow-700'
+                      : msg.sender === MessageSender.USER ? 'bg-cyan-900/50 border border-cyan-700/50'
+                      : 'bg-yellow-900/50 border border-yellow-500/50'
                   }`}>
                     <ChatMessageContent text={msg.text} />
                   </div>
@@ -215,25 +200,53 @@ const App: React.FC = () => {
               {isLoading && (
                 <div className="flex items-start gap-4 max-w-4xl mx-auto">
                   <MessageIcon sender={MessageSender.AI} />
-                  <div className="px-5 py-3 rounded-xl shadow-lg bg-gray-800/80 border border-gray-700 flex items-center space-x-2">
-                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse delay-0"></span>
-                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse delay-200"></span>
-                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse delay-400"></span>
+                  <div className="px-5 py-3 rounded-xl shadow-lg w-full bg-gray-800/80 border border-gray-700">
+                      <div className="flex items-center space-x-2">
+                          <div className="h-2.5 w-2.5 bg-cyan-400 rounded-full animate-pulse" style={{animationDelay: '0s'}}></div>
+                          <div className="h-2.5 w-2.5 bg-cyan-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                          <div className="h-2.5 w-2.5 bg-cyan-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                      </div>
                   </div>
                 </div>
               )}
               <div ref={messagesEndRef} />
             </div>
-            <div className="relative p-4 border-t border-cyan-500/20 bg-gray-900/50 backdrop-blur-sm z-10">
-              <form onSubmit={handleFormSubmit} className="flex items-center gap-4 max-w-4xl mx-auto">
-                <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask The Conqueror..." className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500" disabled={isLoading} />
-                <button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold p-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled={isLoading || !input.trim()}><SendIcon /></button>
+
+            <div className="relative p-4 bg-gray-900/50 backdrop-blur-sm border-t border-cyan-500/20">
+              <form onSubmit={handleFormSubmit} className="max-w-4xl mx-auto">
+                <div className="relative">
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleFormSubmit(e as any);
+                      }
+                    }}
+                    placeholder="Ask The Conqueror..."
+                    className="w-full bg-gray-800 border-2 border-gray-700 rounded-lg py-3 pl-4 pr-14 text-white resize-none focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-all"
+                    rows={1}
+                    style={{ maxHeight: '200px' }}
+                    onInput={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                        e.target.style.height = 'auto';
+                        e.target.style.height = `${e.target.scrollHeight}px`;
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={isLoading || !input.trim()}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-cyan-600 text-white disabled:bg-gray-600 disabled:cursor-not-allowed hover:bg-cyan-500 transition-colors"
+                    aria-label="Send message"
+                  >
+                    <SendIcon />
+                  </button>
+                </div>
               </form>
             </div>
-            </>
+          </>
         )}
-
-        <AdminModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} onFileUpload={handleFileUpload} isUnlocked={isUnlocked} setIsUnlocked={setIsUnlocked} />
       </main>
     </div>
   );
